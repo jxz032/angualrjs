@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AngularJS Practice</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
+
+
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.2.0/angular-animate.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+
+</head>
+
+<body>
+    <div ng-app="myApp">
+
+        <div ng-controller="dataCtrl">
+            <table>
+                <thead>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td>Name</td>
+                        <td>City</td>
+                        <td>Country</td>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr ng-repeat="x in names">
+                        <td>{{x.index}}</td>
+                        <td><input type="checkbox" ng-model="x.isSelected" /></td>
+                        <td>{{x.Name}}</td>
+                        <td>{{x.City}}</td>
+                        <td>{{x.Country}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <button type="submit" ng-click="addSelectedTasks()">Add to TODO List</button>
+
+        </div>
+        <br />
+        <br />
+        <div ng-controller="myCtrl">
+            <span>Remaining: {{remaining()}}</span>
+            <table>
+                <thead>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td>Item</td>
+                        <td></td>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr ng-repeat="x in todos">
+                        <td>{{x.index}}</td>
+                        <td><span class="done-{{x.done}}">{{ x.text }}</span></td>
+                        <td><button ng-click="removeTodo($index)">Remove</button></td>
+                    </tr>
+                </tbody>
+            </table>
+
+           <button type="submit" ng-click="proceed()">Proceed</button>  <p class="progress" ng-show="spinVisible"></p>
+        </div>      
+    </div>
+
+    <!--controller functions-->
+    <script type="text/javascript">	
+	
+        function loadTableData($scope, dataService, todosService) {
+            dataService.getData().then(function (data) {
+                $scope.names = data.data.records;
+            });
+
+            var todos = todosService.todos;
+
+            $scope.addSelectedTasks = function () {
+                //Check if todos list already exist
+                var todoExists = [];  //Extract name property
+                angular.forEach(todos, function (todo) {
+                    todoExists.push(todo.text);
+                });
+
+                var count = todos.length;
+                angular.forEach($scope.names, function (name) {
+                    if (name.isSelected && $.inArray(name.Name, todoExists) == -1) {
+                        count++;
+                        var newTodo = { index: count, text: name.Name, done: false };
+                        todos.push(newTodo);
+                    }
+                });
+            };
+        }
+        loadTableData.$inject = ['$scope', 'dataService', 'todosService'];
+
+
+        function todosListManagement($scope, todosService) {
+
+            $scope.todos = todosService.todos;
+			
+            $scope.removeTodo = function (index) {
+                $scope.todos.splice(index, 1);
+            };
+
+            $scope.remaining = remainingCount;
+
+            $scope.proceed = function () {		    	
+                $scope.remainingCount = remainingCount();
+                proceedTodosList();				
+            };
+
+            function remainingCount() {
+                var count = 0;
+                angular.forEach($scope.todos, function (todo) {
+                    count += todo.done ? 0 : 1;
+                });
+                return count;
+            };
+
+            function setTodoDone(index) {
+                $scope.todos[index].done = true;
+                console.log(index);
+            }
+
+            function proceedTodosList() {
+
+                var index = $scope.todos.length - $scope.remainingCount;
+				$scope.spinVisible = true;
+
+                if ($scope.remainingCount > 0) {
+                    setTodoDone(index);
+                    $scope.remainingCount--;
+                    setTimeout(function () {
+                        $scope.$apply(function () {					    	
+                            proceedTodosList();
+                        });
+                    }, 1000);
+
+                } else {
+                    $scope.remainingCount = remainingCount();
+					$scope.spinVisible = false;
+                }
+            }
+        }
+        todosListManagement.$inject = ['$scope', 'todosService'];
+
+    </script>
+
+    <!--services-->
+    <script type="text/javascript">
+        var app = angular.module('myApp', []);
+
+        app.service('todosService', function () {
+            this.todos = [
+               { index: 1, text: 'learn angular', done: false },
+               { index: 2, text: 'build own project', done: false },
+               { index: 3, text: 'debug', done: false }
+            ];
+
+        });
+
+        app.service('dataService', function ($http) {
+            return {
+                getData: function () {
+                    var names = [];
+                    return $http.get("http://www.w3schools.com/angular/customers.php").success(function (response) {
+					var records = response.records;
+                        angular.forEach(records, function (item) {
+                            var newItem = { "isSelected": false, "Name": item.Name, "City": item.City, "Country": item.Country };
+                            names.push(newItem);
+                        });//foreach
+                        return names;
+                    });//return
+                }
+            }
+        });
+
+
+    </script>
+
+    <!--controllers-->
+    <script type="text/javascript">
+        app.controller("dataCtrl", loadTableData);
+
+        app.controller("myCtrl", todosListManagement);
+    </script>
+
+    <style type="text/css">
+        .done-true {
+            text-decoration: line-through;
+            color: grey;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(1turn);
+            }
+        }
+
+        .progress {
+            position: relative;
+            display: inline-block;
+            width: 5em;
+            height: 5em;
+            margin: 0 .5em;
+            font-size: 4px;
+            text-indent: 999em;
+            overflow: hidden;
+            animation: spin 1s infinite steps(8);
+        }      
+
+        .progress:before, .progress:after, .progress > div:before, .progress > div:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 2.25em;
+            width: 0.5em;
+            height: 1.5em;
+            border-radius: 0.2em;
+            background: #eee;
+            box-shadow: 0 3.5em #eee;
+            transform-origin: 75% 2.5em;
+        }
+
+        .progress:before {
+            background: #555;
+        }
+
+        .progress:after {
+            transform: rotate(-45deg);
+            background: #777;
+        }       
+    </style>
+</body>
+</html>
